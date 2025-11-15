@@ -60,7 +60,7 @@ This project is built with [Vue](https://v3.vuejs.org/) and [Vite](https://vitej
 Clone this project:
 
 ```bash
-git clone https://github.com/alegmalinovsky/pattern-auto-tab-grouper.git
+git clone https://github.com/alegmal/pattern-auto-tab-grouper.git
 cd pattern-auto-tab-grouper
 ```
 
@@ -162,7 +162,7 @@ Issues and pull requests for the mid-pattern wildcard functionality are welcome 
 
 ## Links
 
-- **This Repository**: https://github.com/alegmalinovsky/pattern-auto-tab-grouper
+- **This Repository**: https://github.com/alegmal/pattern-auto-tab-grouper
 - **Original Project**: https://github.com/loilo/auto-group-tabs
 - **Original Issue**: https://github.com/loilo/auto-group-tabs/issues/54
 - **Chrome Extension Documentation**: https://developer.chrome.com/docs/extensions/

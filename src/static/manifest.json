@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "manifest_version": 3,
   "description": "__MSG_appDesc__",
-  "homepage_url": "https://github.com/alegmalinovsky/pattern-auto-tab-grouper",
+  "homepage_url": "https://github.com/alegmal/pattern-auto-tab-grouper",
   "icons": {
     "16": "icons/icon16.png",
     "19": "icons/icon19.png",
