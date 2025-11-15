@@ -9,7 +9,7 @@
       warning
     </mwc-icon>
 
-    <div class="edit" v-if="editable && !sortMode">
+    <div class="edit" v-if="editable">
       <mwc-icon-button
         class="action-button"
         icon="edit"
@@ -23,7 +23,7 @@
         @click="emit('new-matcher')"
       />
     </div>
-    <mwc-icon v-if="sortMode" class="drag-handle">drag_indicator</mwc-icon>
+    <mwc-icon v-if="editable" class="drag-handle">drag_indicator</mwc-icon>
   </div>
 
   <transition name="from-right">
@@ -161,8 +161,19 @@ function remove() {
   }
 
   .drag-handle {
-    cursor: move;
+    cursor: grab;
     padding: 12px 6px;
+    opacity: 0.3;
+    transition: opacity 0.2s ease;
+    color: var(--dimmed);
+  }
+
+  .group-header:hover .drag-handle {
+    opacity: 0.8;
+  }
+
+  .drag-handle:active {
+    cursor: grabbing;
   }
 
   .eyedropper {

@@ -18,13 +18,6 @@
             @start="startDragging"
             @end="dragging = false"
           >
-            <template #header>
-              <SlideVertical :duration="0.3">
-                <div class="sort-hint" v-if="sortMode">
-                  {{ msg.sortHint }}
-                </div>
-              </SlideVertical>
-            </template>
             <template #item="{ element: group }">
               <Group
                 :ref="(component: any) => {
@@ -41,8 +34,6 @@
                 v-model:options="group.options"
                 v-model:matchers="group.matchers"
                 @delete="deleteGroup(group)"
-                @after-enter="resetBodyHeight"
-                :sort-mode="sortMode"
               />
             </template>
           </Draggable>
@@ -50,16 +41,6 @@
       </div>
 
       <div class="bottom-buttons">
-        <mwc-fab
-          v-if="groups.data.value.length > 1"
-          class="secondary-button sort-button"
-          :class="{ toggled: sortMode }"
-          icon="import_export"
-          @click="toggleSortMode"
-          mini
-          :title="msg.buttonSortMode"
-        />
-
         <mwc-fab
           ref="settingsButton"
           class="secondary-button settings-button"
@@ -107,10 +88,9 @@
 import EditDialog from './components/Dialog/EditDialog.vue'
 import SettingsDialog from './components/Dialog/SettingsDialog.vue'
 import Group from './components/Group.vue'
-import SlideVertical from './components/Util/SlideVertical.vue'
 import Layout from './Layout.vue'
 
-import { until, useDebounceFn, useStyleTag } from '@vueuse/core'
+import { until, useStyleTag } from '@vueuse/core'
 import { inject, nextTick, onMounted, ref, watch } from 'vue'
 import Draggable from 'vuedraggable'
 
@@ -162,33 +142,11 @@ function closeSettingsDialog() {
   settingsButton.value.focus()
 }
 
-const sortMode = ref(false)
-function toggleSortMode() {
-  sortMode.value = !sortMode.value
-
-  if (sortMode.value) {
-    // Prevent options dialog height from collapsing
-    document.documentElement.style.setProperty(
-      '--body-height',
-      `${Math.min(document.body.clientHeight, window.innerHeight)}px`
-    )
-
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    })
-  }
-}
-
 const dragging = ref(false)
 function startDragging(event: any) {
   event.item.classList.add('no-matchers')
   dragging.value = true
 }
-
-const resetBodyHeight = useDebounceFn(() => {
-  document.documentElement.style.removeProperty('--body-height')
-}, 100)
 
 function scrollGroupIntoView(id: string) {
   document.getElementById(`group-${id}`)?.scrollIntoView({
