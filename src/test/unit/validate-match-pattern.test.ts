@@ -32,3 +32,25 @@ it('validates match patterns', () => {
   expect(regex.test('http://example.com:invalid-port')).toBe(false)
   expect(regex.test('example.com:invalid-port')).toBe(false)
 })
+
+it('validates mid-pattern wildcard patterns', () => {
+  const regex = new RegExp(matcherPattern)
+
+  // Basic mid-pattern wildcards
+  expect(regex.test('example.*.com')).toBe(true)
+  expect(regex.test('*.example.*.com')).toBe(true)
+  expect(regex.test('012345678909-*.us-east-1.console.aws.amazon.com')).toBe(true)
+  expect(regex.test('foo.*.bar.*.baz.com')).toBe(true)
+
+  // Multiple consecutive wildcards
+  expect(regex.test('example.*.*.domain.com')).toBe(true)
+  expect(regex.test('*.*.*.example.com')).toBe(true)
+
+  // With schemes and paths
+  expect(regex.test('https://example.*.com/*')).toBe(true)
+  expect(regex.test('*://example.*.com/path/*')).toBe(true)
+
+  // With ports
+  expect(regex.test('example.*.com:8080')).toBe(true)
+  expect(regex.test('example.*.com:8080/path')).toBe(true)
+})

@@ -37,11 +37,7 @@ export const matcherPattern =
         
         // Origin
         '(?:' +
-          // Asterisk as subdomain, followed by hostname
-          '\\*\\.[^*:\\/]+' +
-          '|' +
-
-          // Just a hostname
+          // Hostname (can include asterisks anywhere)
           '[^:\\/]+' +
           '|' +
 

@@ -34,14 +34,21 @@ export function generateMatcherRegex(matcher: string) {
   if (simpleScheme) {
     hostPattern = ''
   } else if (typeof host === 'string') {
-    // Three possible formats: *, *.host, host
+    // Four possible formats: *, *.host (single wildcard), host with wildcards, literal host
     if (host === '*') {
+      // Match any host
       hostPattern = '[^/]+'
-    } else if (host.startsWith('*.')) {
-      // Format: *.host
+    } else if (host.startsWith('*.') && host.indexOf('*', 2) === -1) {
+      // Format: *.host with NO other wildcards (optional subdomain)
       hostPattern = generatePatternString(`*${host.slice(2)}`, '(?:[^/]+\\.)?')
+    } else if (host.includes('*')) {
+      // Format: host with asterisks anywhere (required matching)
+      // Each asterisk matches exactly one subdomain level
+      const parts = host.split('*')
+      const escapedParts = parts.map(sanitizeRegex)
+      hostPattern = escapedParts.join('[^./]+')
     } else {
-      // Format: host
+      // Format: literal host (no wildcards)
       hostPattern = sanitizeRegex(host)
     }
 
