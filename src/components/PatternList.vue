@@ -5,6 +5,12 @@
       :key="matcher.id"
       class="pattern-list-new"
     >
+      <mwc-icon-button
+        class="delete-pattern-button"
+        icon="delete"
+        @click="deletePattern(index)"
+        :title="'Delete pattern'"
+      />
       <Textfield
         :ref="(component: any) => {
             if (component === null) {
@@ -41,53 +47,56 @@
         "
       />
     </div>
-    <SlideVertical :disabled="justCreatedNewMatcher" :duration="0.3">
-      <div
-        v-if="showNewMatcherInput"
-        class="pattern-list-new"
-        ref="newMatcherContainer"
-        @focusout="handleBlur"
-      >
-        <Textfield
-          ref="newMatcher"
-          v-model="newMatcherValue"
-          :pattern="matcherPattern"
-          :placeholder="msg.urlInputPlaceholder"
-          @change="handleNewMatcher"
-          @keydown.backspace="
-            newMatcherValue.length === 0 && backspaceFromMatcherInput(-1)
-          "
-          @keydown.enter="returnFromMatcherInput(-1)"
-          @keydown.escape="triggerBlur"
-          :validation-message="msg.invalidUrlPattern"
-          auto-validate
-        />
+    <!-- Always show the new matcher input -->
+    <div
+      class="pattern-list-new"
+      ref="newMatcherContainer"
+      @focusout="handleBlur"
+    >
+      <mwc-icon-button
+        class="delete-pattern-button invisible"
+        icon="delete"
+        disabled
+        :title="''"
+      />
+      <Textfield
+        ref="newMatcher"
+        v-model="newMatcherValue"
+        :pattern="matcherPattern"
+        :placeholder="msg.urlInputPlaceholder"
+        @change="handleNewMatcher"
+        @keydown.backspace="
+          newMatcherValue.length === 0 && backspaceFromMatcherInput(-1)
+        "
+        @keydown.enter="returnFromMatcherInput(-1)"
+        @keydown.escape="triggerBlur"
+        :validation-message="msg.invalidUrlPattern"
+        auto-validate
+      />
 
-        <!--
-          The production build partly eradicates the info icon when used as a
-          regular component, therefore we inject it as innerHTML.
-          -->
-        <a
-          tabindex="-1"
-          class="pattern-list-info"
-          href="https://developer.chrome.com/docs/extensions/mv3/match_patterns/"
-          target="_blank"
-          rel="noopener"
-          :title="msg.matchPatternInfo"
-          v-html="
-            `<mwc-icon-button tabindex='-1' icon='info_outline'></mwc-icon-button>`
-          "
-        />
-      </div>
-    </SlideVertical>
+      <!--
+        The production build partly eradicates the info icon when used as a
+        regular component, therefore we inject it as innerHTML.
+        -->
+      <a
+        tabindex="-1"
+        class="pattern-list-info"
+        href="https://developer.chrome.com/docs/extensions/mv3/match_patterns/"
+        target="_blank"
+        rel="noopener"
+        :title="msg.matchPatternInfo"
+        v-html="
+          `<mwc-icon-button tabindex='-1' icon='info_outline'></mwc-icon-button>`
+        "
+      />
+    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import Textfield from './Form/Textfield.vue'
-import SlideVertical from './Util/SlideVertical.vue'
 
-import { tickResetRef, useSyncedCopy } from '@/composables'
+import { useSyncedCopy } from '@/composables'
 import { matcherPattern } from '@/util/helpers'
 import { computed, nextTick, ref } from 'vue'
 
@@ -124,14 +133,11 @@ const localMatchers = useSyncedCopy(() => {
 defineExpose({
   focus(index: number) {
     matcherRefs.value[localMatchers.value[index].id].component.focus()
-  },
-  showNewMatcher
+  }
 })
 
-const justCreatedNewMatcher = tickResetRef(false)
 const newMatcherValue = ref('')
 const newMatcher = ref()
-const showNewMatcherInput = ref(false)
 
 const isEmpty = (value: string) => value.trim().length === 0
 const isEmptyMatcher = (matcher: { value: string }) => isEmpty(matcher.value)
@@ -150,25 +156,16 @@ function getNonEmptyMatchers() {
   return matchers.map(({ value }) => value)
 }
 
-function showNewMatcher() {
-  showNewMatcherInput.value = true
-
-  nextTick(() => {
-    newMatcher.value.focus()
-  })
-}
-
 function returnFromMatcherInput(matcherIndex: number) {
   setTimeout(() => {
     if (matcherIndex === -1) {
-      showNewMatcher()
-      nextTick(() => {
-        newMatcher.value.focus()
-      })
+      // Already in new matcher input, stay focused
+      newMatcher.value.focus()
     } else if (matcherIndex < sortedMatcherRefs.value.length - 1) {
       sortedMatcherRefs.value[matcherIndex + 1]?.focus()
-    } else if (localMatchers.value[matcherIndex].value.length > 0) {
-      showNewMatcher()
+    } else {
+      // Last pattern - focus new matcher input
+      newMatcher.value.focus()
     }
   }, 0)
 }
@@ -203,9 +200,6 @@ function handleNewMatcher() {
     newMatcher.value?.isValid() &&
     !validMatchers.includes(newMatcherValue.value)
   ) {
-    justCreatedNewMatcher.value = true
-    showNewMatcherInput.value = false
-
     emit('update:modelValue', [...validMatchers, newMatcherValue.value])
 
     newMatcherValue.value = ''
@@ -218,14 +212,13 @@ function triggerBlur(event: KeyboardEvent) {
 
 const newMatcherContainer = ref<HTMLElement>()
 function handleBlur() {
-  setTimeout(() => {
-    if (
-      !newMatcherContainer.value?.contains(document.activeElement) &&
-      newMatcherValue.value.length === 0
-    ) {
-      showNewMatcherInput.value = false
-    }
-  }, 0)
+  // Input is always visible, no need to hide it
+  // Just let the blur happen naturally
+}
+
+function deletePattern(index: number) {
+  localMatchers.value.splice(index, 1)
+  updateMatchers()
 }
 
 function updateMatchers() {
@@ -244,6 +237,25 @@ function updateMatchers() {
   display: flex;
   align-items: center;
   position: relative;
+  gap: 4px;
+}
+
+.delete-pattern-button {
+  flex-shrink: 0;
+  --mdc-icon-size: 20px;
+  color: var(--dimmed);
+  opacity: 0.5;
+  transition: opacity 0.2s, color 0.2s;
+
+  &:hover {
+    opacity: 1;
+    color: var(--mdc-theme-error);
+  }
+
+  &.invisible {
+    visibility: hidden;
+    pointer-events: none;
+  }
 }
 
 .pattern-list-info {
