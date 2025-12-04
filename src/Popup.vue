@@ -5,11 +5,14 @@ import PopupGroupSelection from './components/Popup/GroupSelection.vue'
 import PopupAdditionalActions from './components/Popup/AdditionalActions.vue'
 import EditDialog from './components/Dialog/EditDialog.vue'
 import SlideVertical from './components/Util/SlideVertical.vue'
+import SettingsDialog from './components/Dialog/SettingsDialog.vue'
+import Group from './components/Group.vue'
+import Draggable from 'vuedraggable'
 
-import { ref, computed, onMounted, watch } from 'vue'
-import { useGroupConfigurations, useStorage } from '@/composables'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { useGroupConfigurations, useStorage, useSyncedCopy } from '@/composables'
 import { saveGroupConfigurations } from '@/util/group-configurations'
-import { SaveOptions } from '@/util/types'
+import { SaveOptions, GroupConfiguration } from '@/util/types'
 import { isExtensionWorker, matcherPattern } from '@/util/helpers'
 
 const popupSuggestionRef = ref<InstanceType<typeof PopupSuggestion>>()
@@ -104,15 +107,103 @@ function addLink() {
   popupSuggestionRef.value?.showNewMatcher()
 }
 
-function openOptions() {
-  if (isExtensionWorker) {
-    chrome.runtime.openOptionsPage()
-  } else {
-    window.open('/?context=options')
-  }
+// Toggle for showing all rules inline
+const showAllRules = ref(false)
 
-  window.close()
+function openOptions() {
+  showAllRules.value = true
 }
+
+// Options view state and functions (copied from Options.vue)
+const groupRefs: Record<string, typeof Group> = {}
+const groupsCopy = useSyncedCopy(groups.data, () => {
+  saveGroupConfigurations(groupsCopy.value)
+})
+
+const undoStack: Array<() => void> = []
+function undo() {
+  if (undoStack.length > 0) {
+    const undoAction = undoStack.pop()
+    undoAction!()
+  }
+}
+
+const showOptionsAddDialog = ref(false)
+const optionsAddButton = ref()
+function openOptionsAddDialog() {
+  showOptionsAddDialog.value = true
+}
+function closeOptionsAddDialog() {
+  showOptionsAddDialog.value = false
+  optionsAddButton.value?.focus()
+}
+
+const showSettingsDialog = ref(false)
+const settingsButton = ref()
+function openSettingsDialog() {
+  showSettingsDialog.value = true
+}
+function closeSettingsDialog() {
+  showSettingsDialog.value = false
+  settingsButton.value?.focus()
+}
+
+const dragging = ref(false)
+function startDragging(event: any) {
+  event.item.classList.add('no-matchers')
+  dragging.value = true
+}
+
+function scrollGroupIntoView(id: string) {
+  document.getElementById(`group-${id}`)?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start'
+  })
+}
+
+function deleteGroup(group: GroupConfiguration) {
+  const index = groupsCopy.value.findIndex(
+    searchedGroup => searchedGroup.id === group.id
+  )
+
+  undoStack.push(() => {
+    groupsCopy.value.splice(index, 0, group)
+    nextTick(() => {
+      scrollGroupIntoView(group.id)
+    })
+  })
+  groupsCopy.value.splice(index, 1)
+
+  optionsSnackbar.value?.show()
+}
+
+function addGroupFromOptions(
+  title: string,
+  color: chrome.tabGroups.ColorEnum,
+  { strict, merge }: SaveOptions
+) {
+  const id = crypto.randomUUID()
+
+  groupsCopy.value.push({
+    id,
+    title: title,
+    color: color,
+    matchers: [],
+    options: {
+      strict,
+      merge
+    }
+  })
+
+  nextTick(() => {
+    groupRefs[id]?.showNewMatcher()
+    setTimeout(() => {
+      scrollGroupIntoView(id)
+    }, 0)
+  })
+}
+
+const optionsSnackbar = ref()
 
 function editGroup(id: string) {
   scrollToGroup.data.value = id
@@ -161,7 +252,8 @@ onMounted(() => {
 <template>
   <Layout>
     <Suspense>
-      <div class="popup">
+      <!-- Quick add view -->
+      <div v-if="!showAllRules" class="popup">
         <h1 class="h6">{{ msg.popupHeadline }}</h1>
         <PopupSuggestion ref="popupSuggestionRef" v-model="patterns" />
         <SlideVertical :duration="0.3">
@@ -190,7 +282,7 @@ onMounted(() => {
           />
           <mwc-button
             class="button-show-all"
-            outlined
+            unelevated
             icon="list"
             @click="openOptions"
           >
@@ -214,6 +306,100 @@ onMounted(() => {
             @create-group="createFromCurrentGroup"
             @edit-group="editGroup"
           />
+        </div>
+      </div>
+
+      <!-- Expanded options view -->
+      <div v-else class="popup-expanded">
+        <div class="back-button-row">
+          <mwc-icon-button
+            icon="arrow_back"
+            @click="showAllRules = false"
+            :title="'Back to quick add'"
+          />
+          <h1 class="h6">All Grouping Rules</h1>
+        </div>
+
+        <div class="settings">
+          <div class="groups">
+            <img
+              v-if="groupsCopy.length === 0"
+              src="/arrow.svg"
+              class="initial-arrow"
+              draggable="false"
+            />
+
+            <template v-else>
+              <Draggable
+                v-model="groupsCopy"
+                item-key="id"
+                handle=".drag-handle"
+                drag-class="dragging"
+                @start="startDragging"
+                @end="dragging = false"
+              >
+                <template #item="{ element: group }">
+                  <Group
+                    :ref="(component: any) => {
+                      if (component === null) {
+                        delete groupRefs[group.id]
+                      } else {
+                        groupRefs[group.id] = component
+                      }
+                    }"
+                    :id="`group-${group.id}`"
+                    :group-id="group.id"
+                    v-model:title="group.title"
+                    v-model:color="group.color"
+                    v-model:options="group.options"
+                    v-model:matchers="group.matchers"
+                    @delete="deleteGroup(group)"
+                  />
+                </template>
+              </Draggable>
+            </template>
+          </div>
+
+          <div class="bottom-buttons">
+            <mwc-fab
+              ref="settingsButton"
+              class="secondary-button settings-button"
+              icon="settings"
+              @click="openSettingsDialog"
+              mini
+              :title="msg.buttonSettings"
+            />
+
+            <mwc-fab
+              ref="optionsAddButton"
+              icon="add"
+              @click="openOptionsAddDialog"
+              mini
+              :title="msg.buttonAddGroup"
+            />
+          </div>
+
+          <transition name="from-right">
+            <EditDialog
+              v-if="showOptionsAddDialog"
+              color="grey"
+              @save="addGroupFromOptions"
+              @close="closeOptionsAddDialog"
+            />
+          </transition>
+
+          <transition name="from-right">
+            <SettingsDialog
+              v-if="showSettingsDialog"
+              color="grey"
+              @close="closeSettingsDialog"
+            />
+          </transition>
+
+          <mwc-snackbar :labelText="msg.groupDeletedNotice" ref="optionsSnackbar">
+            <mwc-button slot="action" @click="undo">{{ msg.undo }}</mwc-button>
+            <mwc-icon-button icon="close" slot="dismiss" />
+          </mwc-snackbar>
         </div>
       </div>
     </Suspense>
@@ -267,5 +453,64 @@ onMounted(() => {
 .more-options {
   display: flex;
   gap: 0.5rem;
+}
+
+/* Expanded options view styles */
+.popup-expanded {
+  min-width: 800px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.back-button-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Styles copied from Options.vue */
+.settings {
+  padding-bottom: 60px;
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.bottom-buttons {
+  display: flex;
+  gap: 4px;
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 1;
+}
+
+.initial-arrow {
+  position: fixed;
+  right: 60px;
+  bottom: 67px;
+  width: 80px;
+  height: auto;
+}
+
+.secondary-button {
+  --mdc-fab-box-shadow: 0 3px 5px -1px rgb(0 0 0 / 12%),
+    0 6px 10px 0 rgb(0 0 0 / 6%), 0 1px 18px 0 rgb(0 0 0 / 4%);
+  --mdc-theme-on-secondary: var(--dimmed);
+  --mdc-theme-secondary: var(--white);
+
+  @media (prefers-color-scheme: dark) {
+    --mdc-theme-secondary: var(--black);
+  }
+
+  &.toggled {
+    --mdc-theme-secondary: var(--super-dimmed-primary);
+    --mdc-theme-on-secondary: var(--mdc-theme-primary);
+  }
 }
 </style>
