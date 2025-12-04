@@ -181,12 +181,22 @@ onMounted(() => {
           @update:model-value="selectedGroup = $event"
           @new="openAddDialog"
         />
-        <mwc-button
-          class="button-save"
-          unelevated
-          v-text="msg.popupSaveButton"
-          @click="savePatterns"
-        />
+        <div class="button-row">
+          <mwc-button
+            class="button-save"
+            unelevated
+            v-text="msg.popupSaveButton"
+            @click="savePatterns"
+          />
+          <mwc-button
+            class="button-show-all"
+            outlined
+            icon="list"
+            @click="openOptions"
+          >
+            Show all Rules
+          </mwc-button>
+        </div>
 
         <SlideVertical :duration="0.3">
           <p class="error-message" v-if="errorMessage" v-text="errorMessage" />
@@ -240,8 +250,18 @@ onMounted(() => {
   align-self: flex-start;
 }
 
+.button-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .button-save {
-  align-self: flex-start;
+  flex: 0 0 auto;
+}
+
+.button-show-all {
+  flex: 0 0 auto;
 }
 
 .more-options {
